@@ -1,4 +1,4 @@
-using System;
+using System.Globalization;
 using LegacyOrderService.Models;
 using LegacyOrderService.Data;
 
@@ -8,26 +8,73 @@ namespace LegacyOrderService
     {
         static void Main(string[] args)
         {
+            string name;
             Console.WriteLine("Welcome to Order Processor!");
-            Console.WriteLine("Enter customer name:");
-            string name = Console.ReadLine();
 
-            Console.WriteLine("Enter product name:");
-            string product = Console.ReadLine();
+            do
+            {
+                Console.WriteLine("Enter customer name:");
+                name = Console.ReadLine()?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(name))
+                    Console.WriteLine("Customer name cannot be empty. Please re-enter.");
+            } while (string.IsNullOrEmpty(name));
+
+            string product;
+            double price;
             var productRepo = new ProductRepository();
-            double price = productRepo.GetPrice(product);
+            while (true)
+            {
+                Console.WriteLine("Enter product name:");
+                product = Console.ReadLine()?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(product))
+                {
+                    Console.WriteLine("Product name cannot be empty. Please re-enter.");
+                    continue;
+                }
 
+                try
+                {
+                    price = productRepo.GetPrice(product);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Could not find product or error occurred: {ex.Message}. Please re-enter.");
+                }
+            }
 
-            Console.WriteLine("Enter quantity:");
-            int qty = Convert.ToInt32(Console.ReadLine());
+            int qty;
+            while (true)
+            {
+                Console.WriteLine("Enter quantity:");
+                var input = Console.ReadLine()?.Trim();
+                if (!int.TryParse(input, out qty) || qty <= 0)
+                {
+                    Console.WriteLine("Invalid quantity. Please enter a positive integer.");
+                    continue;
+                }
+                break;
+            }
 
             Console.WriteLine("Processing order...");
 
-            Order order = new Order();
-            order.CustomerName = name;
-            order.ProductName = product;
-            order.Quantity = qty;
-            order.Price = 10.0;
+            var order = new Order
+            {
+                CustomerName = name,
+                ProductName = product,
+                Quantity = qty,
+                Price = price
+            };
+
+            try
+            {
+                order.Validate();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Order is invalid: {ex.Message}");
+                return;
+            }
 
             double total = order.Quantity * order.Price;
 
@@ -35,11 +82,18 @@ namespace LegacyOrderService
             Console.WriteLine("Customer: " + order.CustomerName);
             Console.WriteLine("Product: " + order.ProductName);
             Console.WriteLine("Quantity: " + order.Quantity);
-            Console.WriteLine("Total: $" + price);
+            Console.WriteLine("Total: " + total.ToString("C", CultureInfo.CurrentCulture));
 
             Console.WriteLine("Saving order to database...");
             var repo = new OrderRepository();
-            repo.Save(order);
+            try
+            {
+                repo.Save(order);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to save order: {ex.Message}");
+            }
             Console.WriteLine("Done.");
         }
     }
